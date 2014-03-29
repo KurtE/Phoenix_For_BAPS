@@ -332,6 +332,7 @@ next
 ;Single leg control. Make sure no leg is selected
 SelectedLeg = 255 ; No Leg selected
 Prev_SelectedLeg = 255
+AllDown = 1  ; Init to say everything is down...
 
 ;Body Positions
 BodyPosX = 0

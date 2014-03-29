@@ -1,3 +1,4 @@
+DEBUG_PS2 con 1 ; comment out to remove debug code
 ;Project Lynxmotion Phoenix
 ;Description: Phoenix, control file.
 ;		The control input subroutine for the phoenix software is placed in this file.
@@ -81,7 +82,7 @@ PS2CMD 				con P13		;PS2 controller CMD (Orange)
 PS2SEL 				con P14		;PS2 Controller SEL (Blue)
 PS2CLK 				con P15		;PS2 Controller CLK (White)
 #endif
-PadMode 			con $79
+PadMode 			con $73
 ;--------------------------------------------------------------------
 ;[Ps2 Controller Variables]
 DualShock 			var Byte(7)
@@ -95,6 +96,14 @@ DoubleHeightOn		var bit
 DoubleTravelOn		var bit
 WalkMethod			var bit
 GPSpeedControl		var	bit
+
+lTimerPS2Read		var long
+
+#ifdef DEBUG_PS2
+DSLast				var	Byte(7)
+DSChanged			var	byte
+i					var	byte
+#endif
 
 ;--------------------------------------------------------------------
 ;[InitController] Initialize the PS2 controller
@@ -111,15 +120,15 @@ InitController:
   LastButton(1) = 255
   BodyYOffset = 0
   BodyYShift = 0
-
-  low PS2SEL
-  shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$1\8]
-  shiftin PS2DAT,PS2CLK,FASTLSBPOST,[DS2Mode\8]
-  high PS2SEL
-  pause 1
+  
+;  low PS2SEL
+;  shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$1\8]
+;  shiftin PS2DAT,PS2CLK,FASTLSBPOST,[DS2Mode\8]
+;  high PS2SEL
+;  pause 1
   
 ReInitController:  
-  if DS2Mode <> PadMode THEN
+;  if DS2Mode <> PadMode THEN
 	low PS2SEL
 	shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$1\8,$43\8,$0\8,$1\8,$0\8] ;CONFIG_MODE_ENTER
 	high PS2SEL
@@ -130,15 +139,16 @@ ReInitController:
 	high PS2SEL
 	pause 1
 
-	low PS2SEL
-	shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$01\8,$4F\8,$00\8,$FF\8,$FF\8,$03\8,$00\8,$00\8,$00\8] ;SET_DS2_NATIVE_MODE
-	high PS2SEL
-	pause 1
+; We do not use pressure values so don't try to enable
+;	low PS2SEL
+;	shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$01\8,$4F\8,$00\8,$FF\8,$FF\8,$03\8,$00\8,$00\8,$00\8] ;SET_DS2_NATIVE_MODE
+;	high PS2SEL
+;	pause 1
 
-	low PS2SEL
-	shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$01\8,$43\8,$00\8,$00\8,$5A\8,$5A\8,$5A\8,$5A\8,$5A\8] ;CONFIG_MODE_EXIT_DS2_NATIVE
-	high PS2SEL
-	pause 1
+;	low PS2SEL
+;	shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$01\8,$43\8,$00\8,$00\8,$5A\8,$5A\8,$5A\8,$5A\8,$5A\8] ;CONFIG_MODE_EXIT_DS2_NATIVE
+;	high PS2SEL
+;	pause 1
 
 	low PS2SEL
 	shiftout PS2CMD,PS2CLK,FASTLSBPRE,[$01\8,$43\8,$00\8,$00\8,$00\8,$00\8,$00\8,$00\8,$00\8] ;CONFIG_MODE_EXIT
@@ -147,8 +157,8 @@ ReInitController:
 		
 	sound cSpeakerPin, [100\4000, 100\4500, 100\5000]
 	
-	goto InitController ;Check if the remote is initialized correctly
-  ENDIF
+;	goto InitController ;Check if the remote is initialized correctly
+;  ENDIF
 return
 ;--------------------------------------------------------------------
 ;[ControlInput] reads the input data from the PS2 controller and processes the
@@ -156,15 +166,23 @@ return
 ControlInput:
 
   ; Check if the PS2 remote has timed out	
-  low PS2SEL
-  shiftout PS2CMD,PS2CLK,LSBPRE,[$1\8]
-  shiftin PS2DAT,PS2CLK,LSBPOST,[DS2Mode\8]
-  high PS2SEL
-  pause 1
-  
-  if(DS2Mode <> PadMode)then
+  ; will do like Arduino and use timer
+  ; We know that the main line code got the current time just before calling us, so
+  ; we don't need to grab it here.  But need to do time conversion.
+  GOSUB ConvertTimeMS[lTimerStart-lTimerPS2Read], CycleTime
+  if (lTimerPS2Read = 0) or (CycleTime > 1500) then
 	gosub ReInitController
   endif
+
+;  low PS2SEL
+;  shiftout PS2CMD,PS2CLK,LSBPRE,[$1\8]
+;  shiftin PS2DAT,PS2CLK,LSBPOST,[DS2Mode\8]
+;  high PS2SEL
+;  pause 1
+  
+;  if(DS2Mode <> PadMode)then
+;	gosub ReInitController
+;  endif
 
   ; Read controller input
   low PS2SEL
@@ -173,7 +191,28 @@ ControlInput:
   	DualShock(4)\8, DualShock(5)\8, DualShock(6)\8]
   high PS2SEL
   pause 10	
-  
+
+
+#ifdef DEBUG_PS2
+	DSChanged = 0
+	for i = 0 to 6
+		if DualShock(i) <> DSLast(i) then
+			DSLast(i) = DualShock(i)
+			DSChanged = 1
+		endif
+	next
+	if DSChanged then
+		serout s_out, i9600, ["DS: ", hex DualShock(0), " ", hex Dualshock(1), " ", hex DualSHock(2),  " ", hex DualShock(3),  " ", hex DualSHock(4), |
+					 " ", hex DualShock(5),  " ", hex DualShock(6), 13]  
+	endif
+#endif
+  ; we now don't read in the mode byte any more but one thing we can look at is the first byte, which should be an 0x5a
+  if (DualShock(0) <> 0x5a) then
+  	lTimerPS2Read = 0		    ; trigger a reinit
+  	goto ControlInput           ;
+  endif
+  lTimerPS2Read = lTimerStart	; 
+
   ; Switch bot on/off
   IF (DualShock(1).bit3 = 0) and LastButton(0).bit3 THEN	;Start Button test
 	IF(HexOn) THEN
