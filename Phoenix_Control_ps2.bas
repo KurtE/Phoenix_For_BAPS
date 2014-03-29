@@ -1,4 +1,4 @@
-DEBUG_PS2 con 1 ; comment out to remove debug code
+;DEBUG_PS2 con 1 ; comment out to remove debug code
 ;Project Lynxmotion Phoenix
 ;Description: Phoenix, control file.
 ;		The control input subroutine for the phoenix software is placed in this file.
