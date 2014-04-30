@@ -35,7 +35,6 @@
 ;
 ;====================================================================
 ;USEGP	con	1
-;
 ; We are rolling our own communication protocol between multiple XBees, one in
 ; the receiver (this one) and one in each robot.  We may also setup a PC based
 ; program that we can use to monitor things...
@@ -44,14 +43,14 @@
 ;
 ; Packet Types:
 ;[Packets sent from Remote to Robot]
-XBEE_TRANS_READY		con	0x01	; Transmitter is ready for requests.
+;XBEE_TRANS_READY		con	0x01	; Transmitter is ready for requests.
 	; Optional Word to use in ATDL command
-XBEE_TRANS_NOTREADY		con 0x02	; Transmitter is exiting transmitting on the sent DL
+;XBEE_TRANS_NOTREADY		con 0x02	; Transmitter is exiting transmitting on the sent DL
 	; No Extra bytes.
 XBEE_TRANS_DATA			con	0x03	; Data Packet from Transmitter to Robot*
 	; Packet data described below.  Will only be sent when the robot sends
 	; the remote a XBEE_RECV_REQ_DATA packet and we must return sequence number
-XBEE_TRANS_NEW			con	0x04	; New Data Available
+;XBEE_TRANS_NEW			con	0x04	; New Data Available
 	; No extra data.  Will only be sent when we are in NEW only mode
 XBEE_ENTER_SSC_MODE		con	0x05	; The controller is letting robot know to enter SSC echo mode
 	; while in this mode the robot will try to be a pass through to the robot. This code assumes
@@ -62,21 +61,21 @@ XBEE_ENTER_SSC_MODE		con	0x05	; The controller is letting robot know to enter SS
 	; condition is reached.  Start of with $$<CR> command as to signal exit
 XBEE_REQ_SN_NI			con 0x06	; Request the serial number and NI string
 
-XBEE_TRANS_CHANGED_DATA con                0x07   ; We transmite a bit mask with which fields changed plus the bytes that changes
+;XBEE_TRANS_CHANGED_DATA con                0x07   ; We transmite a bit mask with which fields changed plus the bytes that changes
 
-XBEE_TRANS_NOTHIN_CHANGED con                0x08  ; 
-XBEE_TRANS_DATA_VERSION con                  0x09  ; What format of data this transmitter supports. 
+;XBEE_TRANS_NOTHIN_CHANGED con                0x08  ; 
+;XBEE_TRANS_DATA_VERSION con                  0x09  ; What format of data this transmitter supports. 
                                                    ;  1- New format supports changed data packets...
 
 
 ;[Packets sent from Robot to remote]
-XBEE_RECV_REQ_DATA		con	0x80	; Request Data Packet*
+;XBEE_RECV_REQ_DATA		con	0x80	; Request Data Packet*
 	; No extra bytes, but we do pass a serial number that we expect back 
 	; from Remote in the XBEE_TRANS_DATA_PACKET
-XBEE_RECV_REQ_NEW		con	0x81	; Asking us to send a XBEE_TRANS_NEW message when data changes
-XBEE_RECV_REQ_NEW_OFF	con	0x82	; Turn off that feature...
+;XBEE_RECV_REQ_NEW		con	0x81	; Asking us to send a XBEE_TRANS_NEW message when data changes
+;XBEE_RECV_REQ_NEW_OFF	con	0x82	; Turn off that feature...
 
-XBEE_RECV_NEW_THRESH	con 0x83	; Set new Data thresholds
+;XBEE_RECV_NEW_THRESH	con 0x83	; Set new Data thresholds
 	; currently not implemented
 XBEE_RECV_DISP_VAL		con	0x84	; Display a value on line 2
 	; Will send 4 bytes extra data for value.
@@ -91,7 +90,7 @@ XBEE_SEND_SN_NI_DATA	con 0x88	; Response for REQ_SN_NI - will return
 	; 4 bytes - SNH
 	; 4 bytes - SNL
 	; up to 20 bytes(probably 14) for NI
-XBEE_RECV_REQ_DATA2		con 0x90    ; New format... 
+;XBEE_RECV_REQ_DATA2		con 0x90    ; New format... 
 
 ;[XBEE_TRANS_DATA] - has XBEEPACKETSIZE extra bytes
 ;	0 - Buttons High
@@ -164,9 +163,6 @@ g_fAllowInput		var byte
 ;				data matches our old data. If not we may want to retell the Remote that we
 ;				want new packet only mode.
 ;	
-;				Note: we wont ask for data from the remote until we have received a Transmit ready
-;				packet.  This is what fTransReadyRecvd variable is for.
-;	gosub ReceiveXbeePacket
 ;
 ; On return if fPacketValid is true then the array bPacket Contains valid data.  Other
 ; flags are described below
@@ -175,14 +171,9 @@ bPacket				var	byte(XBEEMAXPACKETSIZE)		; This is the packet of data we will sen
 cbPacket			var byte		; The actual packet size...
 
 fPacketValid		var	bit			; Is the data valid
-fPacketForced		var	bit			; did we force a packet
-fPacketTimeout		var	bit			; Did a timeout happen
-fSendOnlyNewMode	var	bit			; Are we in the mode that we will only receive data when it is new?
 fPacketEnterSSCMode	var	bit			; Did we receive packet to enter SSC mode?
-fTransReadyRecvd	var	bit			; Are we waiting for transmit ready?
 
 CPACKETTIMEOUTMAX	con	100			; Need to define per program as our loops may take long or short...
-cPacketTimeouts		var	word		; See how many timeouts we get...
 
 
 ;==============================================================================
@@ -208,20 +199,16 @@ _bAPISeqNum			var	byte		; We use as a sequence number to verify which packet we 
 _wTransmitterDL		var	word		; this is the current DL we pass to apis...
 _wAPIPacketLen		var	word		; Api Packet length...
 _bAPIRecvRet		var	byte		; return value from API recv packet
-_bTransDataVersion	var	byte		; What version of data is being sent...
 
 _b					var	byte
 _bAPI_i				var	byte		; 
 _bChkSumIn			var	byte
 _lCurrentTimeT		var	long		; 
 _lTimerLastPacket	var	long		; the timer value when we received the last packet
-_lTimerLastRequest	var	long		; what was the timer when we last requested data?
 _lTimeDiffMS		var long		; calculated time difference
 
 _fNewPacketAvail	var	bit			; Is there a new packet available?
 _fPacketValidPrev	var	bit			; The previous valid...
-_fReqDataPacketSent	var	bit			; has a request been sent since we last received one?
-_fReqDataForced		var	bit			; Was our request forced by a timeout?
 _tas_i				var	byte
 _tas_b				var	byte		; 
 _cbRead				var	byte		; how many bytes did we read?
@@ -330,7 +317,6 @@ bXBeeControlMode			var byte
 ;--------------------------------------------------------------------
 InitController:
 	
-	fSendOnlyNewMode = 0
 	gosub InitXBee
    
  	bXBeeControlMode = WalkMode
@@ -741,7 +727,7 @@ _CI_GS_ENDLOOP:
 		abButtonsPrev(1) = bPacket(PKT_BTNHI)
 	else;if fPacketValid
 		; Not a valid packet - we should go to a turned off state as to not walk into things!
-		IF(HexOn and (fPacketForced or fPacketEnterSSCMode)) THEN
+		IF(HexOn) THEN
 			'Turn off
 			Sound cSpeakerPin,[100\5000,80\4500,100\5000,60\4000] ' play it a little different...
 			BodyPosX = 0
@@ -822,12 +808,8 @@ InitXBee:
 				str _XBEE_ATCN_STR\5]				; exit command mode
 	
 	pause 10	; need to wait to exit command mode...
-	cPacketTimeouts = 0
-	fTransReadyRecvd = 0
 	_fPacketValidPrev = 0
 	fPacketEnterSSCMode = 0   
-	_fReqDataPacketSent = 0
-	_fReqDataForced = 0			;
     gosub ClearInputBuffer		; make sure we toss everything out of our buffer and init the RTS pin
 
 return
@@ -1041,6 +1023,7 @@ APIRecvPacket[_fapiWaitForInput]:
 	' First see if the user wants us to wait for input or not
 	;	hserstat HSERSTAT_INPUT_EMPTY, _TP_Timeout			; if no input available quickly jump out.
 	; Well Hserstat is failing, try rolling our own.
+_ARP_Look_For_Packet_Start:
 	if not _fapiWaitForInput then
 		; use the new hserinnext instead of assembly to see if there is input...
 #ifdef BASICATOMPRO28
@@ -1067,7 +1050,9 @@ APIRecvPacket[_fapiWaitForInput]:
 
 	' Lets do a little verify that the packet looks somewhat valid.
 	if (_wAPIPacketLen > APIPACKETMAXSIZE) then
-		return 0
+		; bugbug:: should we flush the input or hope things simply realign?
+		; Or should we go back to look for 7e...  Think I will try that...
+		goto _ARP_Look_For_Packet_Start  ; again hate gotos, but...
 	endif
 
 	' Then read in the packet including the checksum.
@@ -1081,7 +1066,10 @@ APIRecvPacket[_fapiWaitForInput]:
 	next
 
 	if _bChkSumIn <> (0xff - _b) then
-		return 0		' checksum was off
+		; was punting here before, but maybe try to realign and gt
+		; packet.  We get more buffer overruns now with
+		; simple protocol, so see how this works
+		goto _ARP_Look_For_Packet_Start  ; again hate gotos, but...
 	endif
 
 	return _wAPIPacketLen 	' return the packet length as the caller may need to know this...
@@ -1201,9 +1189,7 @@ _pbNI		var	pointer		; need something to point as a byte pointer
 ReceiveXBeePacket:
 	_fPacketValidPrev = fPacketValid		; Save away the previous state as this is the state if no new data...
 	fPacketValid = 0
-	fPacketTimeOut = 0
 	_fNewPacketAvail = 0;
-	fPacketForced = 0;
 	fPacketEnterSSCMode = 0   
 	;	We will first see if we have a packet header waiting for us.
 #ifdef CXBEE_RTS
@@ -1238,8 +1224,6 @@ _RXP_TRY_RECV_AGAIN:
 	;-----------------------------------------------------------------------------
 	; process first as higher number of these come in...
 	if (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_DATA) then
-		' Don't need to worry about checksum or the like as verified higher up...
-		_fReqDataPacketSent = 0	; if we received a packet reset so we will request data again...
 
 		; Allow for packets larger than the data we are actually going to process
 		; Also remember what type of packet we received.  We have had 3 different sizes of with changes
@@ -1249,95 +1233,18 @@ _RXP_TRY_RECV_AGAIN:
 			for _b = 0 to cbPacket-1
 				bPacket(_b) = _bAPIPacket(_b + XBEE_API_PH_SIZE + bDataOffset)
 			next
-			goto _SetToValidDataAndReturn
+
+			fPacketValid = 1	; data is valid
+			GOSUB XBeeResetPacketTimeout ; sets _lTimerLastPacket
+			return	;  		; get out quick!
 		else
 			; Data size is less than minimum 
 ;			toggle p6			; BUGBUG - Debug
 			gosub ClearInputBuffer
 		endif
-	;-----------------------------------------------------------------------------
-	; [XBEE_TRANS_CHANGED_DATA] - We have a packet that is a delta from our current data
-	;			so we need to walk through this data and update the appropriate bytes in
-	;			the packet
-	;-----------------------------------------------------------------------------
-	elseif (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_CHANGED_DATA) 
-		cbPacket = (_bAPIRecvRet-bDataOffset-1) max XBEEMAXPACKETSIZE		; don't allow it to be bigger than our max value
-		if (cbPacket > 2) and (cbPacket < (2+XBEEMAXPACKETSIZE)) then 
-			
-			; going to reuse the wNewDL variable...
-			wNewDL.highbyte = _bAPIPacket(bDataOffset+XBEE_API_PH_SIZE)
-			wNewDL.lowbyte = _bAPIPacket(bDataOffset+XBEE_API_PH_SIZE+1)
-			
-			_b = 0				; offset into complete packet
-			_bAPI_i = XBEE_API_PH_SIZE + bDataOffset + 2;		; offset into our compressed packet
-			while wNewDL
-				if (wNewDL & 0x1) then
-					bPacket(_b) = _bAPIPacket(_bAPI_i)
-					_bAPI_i = _bAPI_i + 1
-				endif
-				_b = _b + 1
-				wNewDL = wNewDL >> 1		; shift it down to next bit
-			wend	
-			goto _SetToValidDataAndReturn
-		endif
-	
-	;-----------------------------------------------------------------------------
-	; [XBEE_TRANS_NOTHIN_CHANGED] - Answer came back from remote telling us that
-	;		nothing was changed since the last packet data we received...
-	;-----------------------------------------------------------------------------
-	elseif (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_NOTHIN_CHANGED) 
 
 _SetToValidDataAndReturn:
-		_fReqDataPacketSent = 0	; if we received a packet reset so we will request data again...
-		fPacketValid = 1	; data is valid
-		cPacketTimeouts = 0	; reset when we have a valid packet
-		fPacketForced = _fReqDataForced	; Was the last request forced???
-		_fReqDataForced = 0				; clear that state now
-		_bTransDataVersion = 0;			; start off assuming old version data...
-		GOSUB XBeeResetPacketTimeout ; sets _lTimerLastPacket
-		return	;  		; get out quick!
 		
-	;-----------------------------------------------------------------------------
-	; [XBEE_TRANS_READY]
-	;-----------------------------------------------------------------------------
-	elseif (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_READY)
-		; Two cases.  everything zero which is the old simple all zero, newer one has the MY of the transmitter, so we will want to update
-		; our DL to point to it...
-		if (_bAPIRecvRet-bDataOffset = (XBEE_API_PH_SIZE + 2) ) then  ; 4 bytes for the packet header + 2 bytes for the extra data!.
-			' Normal format, may later add in 64 bit addressing...
-			wNewDL.highbyte = _bAPIPacket(bDataOffset+XBEE_API_PH_SIZE)
-			wNewDL.lowbyte = _bAPIPacket(bDataOffset+XBEE_API_PH_SIZE+1)
-			fTransReadyRecvd = 1		; OK we have received a packet saying transmitter is ready.	
-			gosub APISetXBeeHexVal["D","L", wNewDL]
-			_wTransmitterDL = wNewDL
-		endif
-		Sound cSpeakerPin,[100\4400]
-
-		GOSUB XBeeResetPacketTimeout ; sets _lTimerLastPacket
-		_fReqDataPacketSent = 0							; make sure we don't think we have any outstanding requests
-		gosub XBeeOutputStringToDL[0, @_PhoenixDebug]			; try with 0 to imply our debug terminal...
-	;-----------------------------------------------------------------------------
-	; [XBEE_TRANS_NOTREADY]
-	;-----------------------------------------------------------------------------
-	elseif (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_NOTREADY)
-		; we are being told that the transmitter may not be valid anymore...
-		Sound cSpeakerPin,[60\3200]
-		fTransReadyRecvd = 0			; Ok not valid anymore...
-		
-	;-----------------------------------------------------------------------------
-	; [XBEE_TRANS_DATA_VERSION]
-	;-----------------------------------------------------------------------------
-	elseif (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_DATA_VERSION)
-		if (_bAPIRecvRet-bDataOffset = (XBEE_API_PH_SIZE + 1) ) then  ; 1 byte for data...
-			_bTransDataVersion = _bAPIPacket(bDataOffset+XBEE_API_PH_SIZE);
-		endif
-
-	;-----------------------------------------------------------------------------
-	; [XBEE_TRANS_NEW]
-	;-----------------------------------------------------------------------------
-	elseif (_bAPIPacket(bDataOffset + 0) = XBEE_TRANS_NEW)
-		; The remote has told us it has new data available for us, so we should now ask for it!
-		_fNewPacketAvail = 1;
 	;-----------------------------------------------------------------------------
 	; [XBEE_REQ_SN_NI]
 	;-----------------------------------------------------------------------------
@@ -1383,48 +1290,20 @@ _RXP_CHECKFORHEADER_TO:
 	; Only send when we know the transmitter is ready.  Also if we are in the New data only mode don't ask for data unless we have been told there
 	; is new data. We relax this a little and be sure to ask for data every so often as to make sure the remote is still working...
 	; 
-	if fTransReadyRecvd then
+	if _fPacketValidPrev then		; We had a valid previous packet?
 		GOSUB GetCurrentTime[], _lCurrentTimeT
 
 		; Time in MS since last packet
         gosub ConvertTimeMS[_lCurrentTimeT-_lTimerLastPacket], _lTimeDiffMS
 
-		; See if we exceeded a global timeout.  If so let caller know so they can stop themself if necessary...
-		if _ltimeDiffMS > CXBEETIMEOUTRECVMS then
-			fPacketValid = 0
-			fPacketForced = 1
-			return
-		endif
-
-		; see if we have an outstanding request out and if it timed out...
-		if _fReqDataPacketSent then
-	        gosub ConvertTimeMS[_lCurrentTimeT-_lTimerLastRequest], _lTimeDiffMS
-			if _lTimeDiffMS > CXBEEPACKETTIMEOUTMS then
-				; packet request timed out, force a new attempt.
-				_fNewPacketAvail = 1		; make sure it requests a new one	
-				_fReqDataPacketSent = 0		; turn off that we sent it
-			endif
-		endif
 		
-		; Next see if it has been too long since we received a packet.  Ask to make sure they are there...
-		if (_fNewPacketAvail = 0) and (_lTimeDiffMS > CXBEEFORCEREQMS) then
-			_fNewPacketAvail = 1
-			_fReqDataForced = 1		; remember that this request was forced!
+		; Next see if it has been too long since we received a packet, if so tell caller we are no longer valid
+		;
+		if (_lTimeDiffMS > CXBEEPACKETTIMEOUTMS) then
+			fPacketValid = 0	; Say the data is in the same state as the previous call...
+		else
+			fPacketValid = 1	; could use prev value, but know that was valid
 		endif
-
-		if ((fSendOnlyNewMode = 0) or (fSendOnlyNewMode and _fNewPacketAvail)) then
-			; Now send out a prompt request to the transmitter:
-			if _fReqDataPacketSent = 0 then 
-				if _bTransDataVersion = 0 then
-					gosub SendXBeePacket [_wTransmitterDL, XBEE_RECV_REQ_DATA, 0, 0]		; Request data Prompt (CmdType, ChkSum, Packet Number, CB extra data)
-				else
-					gosub SendXBeePacket [_wTransmitterDL, XBEE_RECV_REQ_DATA2, 0, 0]		; Transmitter supports new method with delta packets...
-				endif
-				_fReqDataPacketSent = 1	; 											; yes we have already sent one.
-				GOSUB GetCurrentTime[], _lTimerLastRequest							; use current time to take care of delays...
-			endif
-		endif
-		fPacketValid = _fPacketValidPrev	; Say the data is in the same state as the previous call...
 	endif
 	return
 
