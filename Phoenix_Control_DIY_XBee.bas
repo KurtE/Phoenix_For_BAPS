@@ -215,8 +215,8 @@ _cbRead				var	byte		; how many bytes did we read?
 
 wNewDL				var	word
 
-CXBEE_BAUD				con H62500				; Non-standard baud rate for xbee but...
-
+;CXBEE_BAUD				con H62500				; Non-standard baud rate for xbee but...
+CXBEE_BAUD			con H38400
 ; Also define some timeouts.  Allow users to override
 CXBEEPACKETTIMEOUTMS con 500					; how long to wait for packet after we send request
 CXBEEFORCEREQMS		con	1000					; if nothing in 1 second force a request...
@@ -1236,6 +1236,18 @@ _RXP_TRY_RECV_AGAIN:
 
 			fPacketValid = 1	; data is valid
 			GOSUB XBeeResetPacketTimeout ; sets _lTimerLastPacket
+
+			
+			; also check and save away the DL of the last message...
+			; warning only supporting 16 bit addressing
+			wNewDL.highbyte = _bAPIPacket(1)
+			wNewDL.lowbyte = _bAPIPacket(2)
+			if wNewDL <> _wTransmitterDL then
+				gosub APISetXBeeHexVal["D","L", wNewDL]
+				_wTransmitterDL = wNewDL
+;				hserout HSP_DEBUG, ["Transmitter DL: ", HEX _wTransmitterDL, 13]
+			endif
+			
 			return	;  		; get out quick!
 		else
 			; Data size is less than minimum 

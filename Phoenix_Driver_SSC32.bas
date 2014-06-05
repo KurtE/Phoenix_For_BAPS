@@ -132,23 +132,30 @@ ConvertTimeMS[_ttconv]:
 ;--------------------------------------------------------------------
 ;[CheckGPEnable] Checks to see if the SSC-32 support the general purpose sequences
 #ifndef cNOGP
+GPVerData	var byte(100)		;Received data to check the SSC Version
 CheckGPEnable:
 	
   pause 10
+  input cSSC_IN  ; should not be needed... 
   GPEnable=0
   serout cSSC_OUT, cSSC_BAUD, ["ver", 13]
-	
-GetSSCVersion:
-  serin cSSC_IN, cSSC_BAUD, 10000, timeout, [GPVerData(Index)]
-  Index = (Index+1)//3 ; shift last 3 chars in data
-  goto GetSSCVersion
-	
-timeout:
-  if (GPVerData(0) + GPVerData(1) + GPVerData(2)) = 164 then ; Check if the last 3 chars are G(71) P(80) cr(13)
-	return 1
-  else
-  	sound cSpeakerPin, [40\5000,40\5000]
+  serin cSSC_IN, cSSC_BAUD, 10000, timeout, [str GPVerData\100\13]
+    hserout 1, ["SSC Ver: ", hex GPVerData(0), hex GPVerData(1), " ", str GPVerData\100\13, 13]
+  index = 0
+  while (GPVerData(Index) <> 13) and (index < 100)
+  	index = index + 1
+  wend
+  if ((index >=2) and (GPVerData(Index-2) = "G") and (GPVerData(Index-1) = "P")) then
+    hserout 1, ["SSC GP enabled", 13]
+    pause 1000
+  	return 1
   endif
+  
+Timeout:
+    hserout 1, ["SSC Not GP enabled", 13]
+  	sound cSpeakerPin, [40\5000,40\5000]
+ pause 1000
+
 return 0
 
 ;--------------------------------------------------------------------
@@ -315,4 +322,11 @@ CommitServoDriver:
   gosub ControlAllowInput[1];
 return
 ;--------------------------------------------------------------------
-	
+
+;--------------------------------------------------------------------
+;[Read Servo Offsets
+SERVOSAVECNT	con	32				
+aServoOffsets	var	sword(SERVOSAVECNT)		; Our new values - must take stored away values into account...
+
+ReadServoOffsets:
+return	

@@ -59,8 +59,9 @@ InitTimer:	; Can use either name...
 InitServoDriver:
 ; Arc32 will use timer associated with HSERVO
 
+
   ; DEBUG: setup 
-  sethserial1 H38400
+;  sethserial1 H38400 - put in  phoenix_core
 
 ; Read in servo offsets.
   gosub ReadServoOffsets

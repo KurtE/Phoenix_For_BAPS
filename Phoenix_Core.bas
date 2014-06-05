@@ -156,7 +156,6 @@ prev_butC var bit
 ;[GP PLAYER]
 GPStart		var byte		;Start the GP Player
 GPSeq		var byte		;Number of the sequence
-GPVerData	var byte(3)		;Received data to check the SSC Version
 GPEnable	var bit			;Enables the GP player when the SSC version ends with "GP<cr>"
 GPSM		var sword		;Speed Multiply ratio +- 200
 ;--------------------------------------------------------------------
@@ -308,6 +307,14 @@ Walking			var bit		; True if the robot are walking
 
 ;====================================================================
 ;[INIT]
+
+  ; DEBUG: setup  only on Arc32...
+
+#ifdef BASICATOMPROARC32
+  pause 500
+  sethserial1 H38400
+  hserout 1, ["Phoenix Arc32 New XBee test", 13]
+#endif
 
 ;Checks SSC version number if it ends with "GP"
 ;enable the GP player if it does

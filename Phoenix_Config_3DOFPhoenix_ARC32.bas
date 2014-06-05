@@ -1,4 +1,3 @@
-USE_IDLEPROC con 1
 ;Project Lynxmotion Phoenix
 ;Description: 3DOF Phoenix running on Arc32, configuration file.
 ;      All Hardware connections (excl controls) and body dimensions 
@@ -23,6 +22,8 @@ USE_IDLEPROC con 1
 							; the voltage drops below this setpoint (630 = 6.3V)
 
 
+USE_IDLEPROC con 1
+
 ;[ARC32 PIN NUMBERS]
 cEyesPin      	con P0
 cSpeakerPin		con P19
@@ -32,8 +33,13 @@ PS2CMD 			con P41		;PS2 controller CMD (Orange)
 PS2SEL 			con P42		;PS2 Controller SEL (Blue)
 PS2CLK 			con P43		;PS2 Controller CLK (White)
 
+cSSC_OUT		con P4
+cSSC_IN			con	p5
+cSSC_BAUD       con i38400	;SSC32 BAUD rate 38400 115200
 
+cXBEE_RTS		con P31
 
+#ifndef USE_SSC32
 cRRCoxaPin 		con P31	;Rear Right leg Hip Horizontal
 cRRFemurPin 	con P30	;Rear Right leg Hip Vertical
 cRRTibiaPin 	con P29	;Rear Right leg Knee
@@ -57,6 +63,39 @@ cLMTibiaPin 	con P10	;Middle Left leg Knee
 cLFCoxaPin 		con P9	;Front Left leg Hip Horizontal
 cLFFemurPin 	con P8	;Front Left leg Hip Vertical
 cLFTibiaPin 	con P4	;Front Left leg Knee
+#else
+; Using SSC-32 to control servos.
+cRRCoxaPin      con 0   ;Rear Right leg Hip Horizontal
+cRRFemurPin     con 1   ;Rear Right leg Hip Vertical
+cRRTibiaPin     con 2   ;Rear Right leg Knee
+cRRTarsPin      con 3   ; Tar
+
+cRMCoxaPin      con 4   ;Middle Right leg Hip Horizontal
+cRMFemurPin     con 5   ;Middle Right leg Hip Vertical
+cRMTibiaPin     con 6   ;Middle Right leg Knee
+cRMTarsPin      con 7   ; Tar
+
+cRFCoxaPin      con 8   ;Front Right leg Hip Horizontal
+cRFFemurPin     con 9   ;Front Right leg Hip Vertical
+cRFTibiaPin     con 10   ;Front Right leg Knee
+cRFTarsPin      con 11   ; Tar
+
+cLRCoxaPin      con 16   ;Rear Left leg Hip Horizontal
+cLRFemurPin     con 17   ;Rear Left leg Hip Vertical
+cLRTibiaPin     con 18   ;Rear Left leg Knee
+cLRTarsPin      con 19   ; Tar
+
+cLMCoxaPin      con 20   ;Middle Left leg Hip Horizontal
+cLMFemurPin     con 21   ;Middle Left leg Hip Vertical
+cLMTibiaPin     con 22   ;Middle Left leg Knee
+cLMTarsPin      con 23   ; Tar
+
+cLFCoxaPin      con 24   ;Front Left leg Hip Horizontal
+cLFFemurPin     con 25   ;Front Left leg Hip Vertical
+cLFTibiaPin     con 26   ;Front Left leg Knee
+cLFTarsPin      con 27   ; Tar
+#endif
+
 
 ;--------------------------------------------------------------------
 ;[Joint offsets]

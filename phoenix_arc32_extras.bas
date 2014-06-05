@@ -42,6 +42,8 @@ cbSSCWrite1stBlock 	var byte	; Use for 32 byte boundary alignment when we are ou
 swServo		var	sword
 wDebugLevel	var byte
 
+	
+ARC32_SSC_OFFSET	con	0x400		; we will offset saving all of the SSC-32 by this amount
 
 
 ;==============================================================================
@@ -55,6 +57,7 @@ InitIdleProc:
 
 	gosub IdleProcShowCmdList
 	gosub IdleProc
+	hserout 1, ["Idle proc init", 13];
 	return
 
 ;==============================================================================
@@ -329,6 +332,17 @@ _TO_DEEP
 ; Warning I am going to reuse the variables I used to run sequences.  WIll need to extract these
 ; if I wish to have a standalone version of this stuff
 ;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@	
+; BUGBUG - different variable names - so for now just define for SSC32
+#ifdef USE_SSC32
+wGPSeqPtr var word
+abGPServoPins	var	byte(32)		; remember which pins are defined for this sequence
+bGPCntServos	var	byte			; how many servos are used in this sequence
+bGPServoNum		var	byte
+bGPCntSteps		var	byte			; how many moves are in this sequence...
+bGPStepNum		var	byte			; which step are we on.
+wGPStepTime		var	word			; How long this step will take
+#endif
+
 _TM_ProcessViewSequenceCmd:
 	if _TM_szIn(1) = 13 then
 		_TM_wDumpStart = 0	; assume the first one.
@@ -459,8 +473,6 @@ MAXOFFSET		con	2000					; what is the maximum offset we will allow
 SHOWOFFSET		con 1500
 #endif
 
-;SERVOSAVECNT	con	32				
-;aServoOffsets	var	sword(SERVOSAVECNT)		; This is up in phoenix_v32.bas..
 
 bTemp			var	byte(30);	; buffer to read stuff into
 bChar			var	byte
@@ -511,7 +523,6 @@ AfterTable:
 ; Complete initialization
 ;==============================================================================
 _TM_ProcessServoOffsetsCmd:
-
 AfterSSC_Reboot:
 	iServoTable = 0
 	bCurServo = ServoTable(iServoTable)
@@ -720,13 +731,13 @@ return
 ; then it puts it to the current position...
 ;==============================================================================
 ShowWhichServo:
-	gosub MoveAServo[bCurServo, -SHOWOFFSET, 128]	; move each servo to center point
-	pause 128
-	gosub MoveAServo[bCurServo, SHOWOFFSET, 128]	; move each servo to center point
-	pause 128
+	gosub MoveAServo[bCurServo, -SHOWOFFSET, 400]	; move each servo to center point
+	pause 400
+	gosub MoveAServo[bCurServo, SHOWOFFSET, 400]	; move each servo to center point
+	pause 400
 	; move to current position which is 1500 + our offset...
-	gosub MoveAServo[bCurServo, aServoOffsets(bCurServo), 128]	; move each servo to center point
-	pause 128
+	gosub MoveAServo[bCurServo, aServoOffsets(bCurServo), 400]	; move each servo to center point
+	pause 400
 
 
 	xor.l	er0, er0	; zero out the whole thing
@@ -759,6 +770,8 @@ ShowWhichServo:
 ;
 ;==============================================================================
 WriteServoOffsets:
+#ifdef USE_SSC32
+#else
 	; OK First calculate the checksum
 	; We will do something simple like add all of the bytes to each other.
 	; bugbug:: If like bap28 can not write more than 32 bytes at a time so
@@ -783,9 +796,8 @@ WriteServoOffsets:
 	pause 10
 	writedm 64, [str aServoOffsets(16)\32]
 	pause 10
-	
+#endif	
 	return 1 ; always jump to the start after this...
-
 ;##################################################################################################
 ;------------------------------------------------------------------------------
 ; Download sequences.
@@ -949,8 +961,6 @@ _TMDL_Error:
 ; 				ARC 32 version
 ;$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ;$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-	
-ARC32_SSC_OFFSET	con	0x400		; we will offset saving all of the SSC-32 by this amount
 ;===============================================================================
 ; ClearSeqPtrs
 ;===============================================================================
