@@ -774,6 +774,27 @@ _WTC_LOOP:
 	return
 
 
+;==============================================================================
+; [XBeeHSerAvail] - Try to find out how many bytes are in the queue
+;==============================================================================
+cbXBeeAvail var byte
+
+XBeeHSerAvail:
+	nop						; transisition to assembly language.
+#ifdef BASICATOMPRO28
+	mov.b	@_HSERINSTART,r0l
+	mov.b	@_HSERINEND,r0h
+#else
+	mov.b	@_HSERIN2START,r0l
+	mov.b	@_HSERIN2END,r0h
+#endif	
+	sub.b	r0l,r0h
+	and.b	#0x7f, r0h
+	mov.b	r0h,@CBXBEEAVAIL:16
+
+	;hserstat 5, WaitTransmitComplete				; wait for all output to go out...	
+	return
+
 
 ;==============================================================================
 ; [InitXbee] - Initialize the XBEE for use with DIY support
@@ -1014,6 +1035,7 @@ APIGetXBeeStringVal[_c1, _c2, _pbSVal, _cbSVal]:
 ;		- Will return TRUE if it receives something, else false
 ;		
 ;==============================================================================
+MINXBEECBPACKET con 8		; some minimal number of characters to have in queue before we process
 _fapiWaitForInput	var	byte
 APIRecvPacket[_fapiWaitForInput]:
 
@@ -1022,17 +1044,12 @@ APIRecvPacket[_fapiWaitForInput]:
 	; Well Hserstat is failing, try rolling our own.
 _ARP_Look_For_Packet_Start:
 	if not _fapiWaitForInput then
-		; use the new hserinnext instead of assembly to see if there is input...
-#ifdef BASICATOMPRO28
-		if (hserinnext 0x81) = -1 then
-#else
-		if (hserinnext 0x82) = -1 then
-#endif
+		; make sure we have a minimal number of characters available
+		gosub XBeeHSerAvail
+		if cbXBeeAvail < MINXBEECBPACKET then
 			return 0;
 		endif
-	endif	
-
-
+	endif
 	' now lets try to read in the header part of the packet.  Note, we will provide some
 	' timeout for this as we don't want to completely hang if something goes wrong!
 	' will not get out of the loop until either we time out or we get an appropriate start
