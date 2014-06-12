@@ -173,8 +173,6 @@ cbPacket			var byte		; The actual packet size...
 fPacketValid		var	bit			; Is the data valid
 fPacketEnterSSCMode	var	bit			; Did we receive packet to enter SSC mode?
 
-CPACKETTIMEOUTMAX	con	100			; Need to define per program as our loops may take long or short...
-
 
 ;==============================================================================
 ; XBEE standard strings to save memory - by Sharin
@@ -218,9 +216,7 @@ wNewDL				var	word
 ;CXBEE_BAUD				con H62500				; Non-standard baud rate for xbee but...
 CXBEE_BAUD			con H38400
 ; Also define some timeouts.  Allow users to override
-CXBEEPACKETTIMEOUTMS con 500					; how long to wait for packet after we send request
-CXBEEFORCEREQMS		con	1000					; if nothing in 1 second force a request...
-CXBEETIMEOUTRECVMS	con	2000					; 2 seconds if we receive nothing
+CXBEEPACKETTIMEOUTMS con 750					; how long to wait for packet after we send request
 
 ;==============================================================================
 ; If XBEE is on HSERIAL, then define some more stuff...
@@ -857,6 +853,7 @@ _XOSTODL_DoIt:
 	mov.b	r1l, @_TAS_B:16			; save away count to pass to the serial output...
 
 	gosub SendXBeePacket[wDL, XBEE_RECV_DISP_STR, _tas_b, pString]		; Send Data to remote (CmdType, ChkSum, Packet Number, CB extra data)
+	GOSUB XBeeResetPacketTimeout 	; reset the timeout 
 
 return
 
@@ -1052,6 +1049,7 @@ _ARP_Look_For_Packet_Start:
 	if (_wAPIPacketLen > APIPACKETMAXSIZE) then
 		; bugbug:: should we flush the input or hope things simply realign?
 		; Or should we go back to look for 7e...  Think I will try that...
+		hserout 1, ["API Packet size error", 13]
 		goto _ARP_Look_For_Packet_Start  ; again hate gotos, but...
 	endif
 
@@ -1075,6 +1073,7 @@ _ARP_Look_For_Packet_Start:
 	return _wAPIPacketLen 	' return the packet length as the caller may need to know this...
 	
 _ARP_TO:
+	hserout 1, ["XBeeRecvPacket  Tmeout", 13]
 	return 0  ; we had a timeout
 
 ;==============================================================================
@@ -1247,12 +1246,17 @@ _RXP_TRY_RECV_AGAIN:
 				_wTransmitterDL = wNewDL
 ;				hserout HSP_DEBUG, ["Transmitter DL: ", HEX _wTransmitterDL, 13]
 			endif
-			
-			return	;  		; get out quick!
+			;
+			; We receive lots of packets quickly, maybe keep trying to read in as many as possible
+			; and return the last valid one.
+			goto _RXP_CHECKFORHEADER_TO
+						
+;			return	;  		; get out quick!
 		else
 			; Data size is less than minimum 
 ;			toggle p6			; BUGBUG - Debug
 			gosub ClearInputBuffer
+			hserout 1, ["Length data packet error", 13]	;bugbug bugbug
 		endif
 
 _SetToValidDataAndReturn:
@@ -1312,6 +1316,7 @@ _RXP_CHECKFORHEADER_TO:
 		; Next see if it has been too long since we received a packet, if so tell caller we are no longer valid
 		;
 		if (_lTimeDiffMS > CXBEEPACKETTIMEOUTMS) then
+			hserout 1, ["XBee Packet Timeout", 13]	;BUGBUG BUGBUG ...
 			fPacketValid = 0	; Say the data is in the same state as the previous call...
 		else
 			fPacketValid = 1	; could use prev value, but know that was valid
