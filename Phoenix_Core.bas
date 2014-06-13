@@ -240,7 +240,7 @@ IKSolutionError		var bit		;Output true if the solution is NOT possible
 lCurrentTime		var long	
 lTimerStart			var long	;Start time of the calculation cycles
 lTimerEnd			var long 	;End time of the calculation cycles
-CycleTime			var byte	;Total Cycle time
+CycleTime			var word	;Total Cycle time
 
 SSCTime  			var word	;Time for servo updates
 PrevSSCTime			var word	;Previous time for the servo updates
@@ -502,11 +502,21 @@ main:
    IF (GaitPeak > 2)  or Walking THEN ; Walking, sync required
       Walking = (GaitPeak > 2)      ; This make sure the last walking cycle to be synced
        ;Get endtime and calculate wait time
+#ifdef BACKGROUND_CHECK_INPUT
+      GOSUB DelayWithBackgroundInput[PrevSSCTime]	; do the delay
+#else	  
+       ;Wait for previous commands to be completed while walking
       GOSUB GetCurrentTime[], lTimerEnd   
       GOSUB ConvertTimeMS[lTimerEnd-lTimerStart], CycleTime
+	  if (PrevSSCTime > CycleTime) then 
+      	pause (PrevSSCTime - CycleTime) ;   Min 1 ensures that there alway is a value in the pause command  
+      endif 	
+#endif
+#ifdef BACKGROUND_CHECK_INPUT
+   ELSE
+      GOSUB DelayWithBackgroundInput[50]	; do the delay
+#endif	  
 
-       ;Wait for previous commands to be completed while walking
-     pause (PrevSSCTime - CycleTime) MIN 1 ;   Min 1 ensures that there alway is a value in the pause command  
    ENDIF
 
    ; Commit servo positions - Note: moved here by Kurt
@@ -520,8 +530,18 @@ main:
       GOSUB UpdateServoDriver
    	  GOSUB CommitServoDriver ;Send commit before pause command
       Sound cSpeakerPin,[100\5000,80\4500,60\4000]      
+
+#ifdef BACKGROUND_CHECK_INPUT
+      GOSUB GetCurrentTime[], lTimerStart   
+      GOSUB DelayWithBackgroundInput[600]	; do the delay
+#else
       pause 600
+#endif
     ELSE   
+#ifdef BACKGROUND_CHECK_INPUT
+      GOSUB GetCurrentTime[], lTimerStart   
+      GOSUB DelayWithBackgroundInput[50]	; do the delay
+#endif
 	  GOSUB FreeServos
 	  Eyes = 0
     ENDIF
@@ -544,6 +564,30 @@ main:
   ENDIF
   
 goto main
+
+;====================================================================
+; [DelayWithBackgroundInput]
+;====================================================================
+#ifdef BACKGROUND_CHECK_INPUT
+_wDelayMS var word		
+DelayWithBackgroundInput[_wDelayMS]:
+	GOSUB GetCurrentTime[], lTimerEnd   
+    GOSUB ConvertTimeMS[lTimerEnd-lTimerStart], CycleTime
+	if (_wDelayMS > CycleTime) then 
+	    WHILE ((_wDelayMS > CycleTime) and ((_wDelayMS - CycleTime) > BACKGROUND_CHECK_INPUT))
+;	      hserout 1, ["BCI ", dec PrevSSCTime, " > ", dec CycleTime, "(", dec lTimerEnd, "-", dec lTimerStart,")", 13]
+	      GOSUB ControlBackgroundInput	; Read in any pending inputs as to not overflow queues
+	      pause 5;	// sleep at least a little...	
+	      GOSUB GetCurrentTime[], lTimerEnd   
+          GOSUB ConvertTimeMS[lTimerEnd-lTimerStart], CycleTime
+	    WEND
+		if (_wDelayMS > CycleTime) then 
+			pause (_wDelayMS - CycleTime)
+	    endif
+	endif
+	return 
+#endif
+
 ;dead:
 ;goto dead
 ;====================================================================

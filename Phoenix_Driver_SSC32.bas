@@ -274,8 +274,8 @@ return -1
 ;**********************************************************************
 UpdateServoDriver:
    gosub ControlAllowInput[0];
+    disable TIMERINT 		;disable timer interrupt
 
-  disable TIMERINT 		;disable timer interrupt
   for LegIndex = 0 to 5
     ; Calulate 
 	GOSUB GetPWMValues [LegIndex]
@@ -289,8 +289,10 @@ UpdateServoDriver:
 	    serout cSSC_OUT, cSSC_BAUD, [0x80+cTarsPin(LegIndex) ,TarsPWM.highbyte,  TarsPWM.lowbyte]
 	endif
 #endif    	                         
+
   next
   
+  enable TIMERINT
   gosub ControlAllowInput[1];
 
   PrevSSCTime = SSCTime
@@ -299,10 +301,12 @@ return
 ;[FREE SERVOS] Frees all the servos (binary)
 FreeServos
     gosub ControlAllowInput[0];
-    disable TIMERINT
 	for LegIndex = 0 to 31
+	  disable TIMERINT
       serout cSSC_OUT, cSSC_BAUD, [0x80+LegIndex, 0, 0]
+      enable TIMERINT
     next
+    disable TIMERINT
     serout cSSC_OUT, cSSC_BAUD, [0xA1, 0, 200]
     enable TIMERINT
     gosub ControlAllowInput[1];
@@ -316,8 +320,6 @@ CommitServoDriver:
   ; With Binary mode we need to output the speed 3 bytes to do a commit. 
   ;Send speed
   serout cSSC_OUT, cSSC_BAUD, [0xA1,SSCTime.highbyte,SSCTime.lowbyte]
-  enable TIMERINT
-  ;serout cSSC_OUT, cSSC_BAUD, [13]	; Ascii text commit of a command
   enable TIMERINT
   gosub ControlAllowInput[1];
 return

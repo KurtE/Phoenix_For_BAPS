@@ -744,6 +744,19 @@ _CI_GS_ENDLOOP:
 
 return
 
+;==============================================================================
+; [ControlBackgroundInput] Optional function that the main delay functions should
+;	call to process any pending data
+;==============================================================================
+
+#ifdef BACKGROUND_CHECK_INPUT
+ControlBackgroundInput:
+	; for now simply try to call off to read xbee packets
+	gosub ReceiveXBeePacket
+	return
+#endif
+
+
 
 ;$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ; From XBEE_TASERIAL_SUPPORT
@@ -1036,6 +1049,7 @@ APIGetXBeeStringVal[_c1, _c2, _pbSVal, _cbSVal]:
 ;		
 ;==============================================================================
 MINXBEECBPACKET con 8		; some minimal number of characters to have in queue before we process
+_wapiWaitTime		var word	; how long to wait...
 _fapiWaitForInput	var	byte
 APIRecvPacket[_fapiWaitForInput]:
 
@@ -1043,35 +1057,44 @@ APIRecvPacket[_fapiWaitForInput]:
 	;	hserstat HSERSTAT_INPUT_EMPTY, _TP_Timeout			; if no input available quickly jump out.
 	; Well Hserstat is failing, try rolling our own.
 _ARP_Look_For_Packet_Start:
+	gosub XBeeHSerAvail
 	if not _fapiWaitForInput then
 		; make sure we have a minimal number of characters available
-		gosub XBeeHSerAvail
 		if cbXBeeAvail < MINXBEECBPACKET then
 			return 0;
+		_wapiWaitTime = 100	; real short time, should not have to wait.
 		endif
+	else
+		_wapiWaitTime = 30000	; Longer wait as caller asked us to wait...
 	endif
 	' now lets try to read in the header part of the packet.  Note, we will provide some
 	' timeout for this as we don't want to completely hang if something goes wrong!
 	' will not get out of the loop until either we time out or we get an appropriate start
 	' character for a packet
+		_wAPIPacketLen = -1  ; init to zero for debug
+#if 0
+	hserin HSP_XBEE, _ARP_TO, _wapiWaitTime, [wait(0x7e), _wAPIPacketLen.highbyte, _wAPIPacketLen.lowbyte]
+#else
 	repeat
-		hserin HSP_XBEE, _ARP_TO, 20000, [_bAPIPacket(0)]
+		hserin HSP_XBEE, _ARP_TO, _wapiWaitTime, [_bAPIPacket(0)]
 	until _bAPIPacket(0) = 0x7E
 
-	hserin HSP_XBEE,  _ARP_TO,20000, [_wAPIPacketLen.highbyte, _wAPIPacketLen.lowbyte]
+	_wAPIPacketLen = 0  ; init to zero for debug
 
+	hserin HSP_XBEE,  _ARP_TO,30000, [_wAPIPacketLen.highbyte, _wAPIPacketLen.lowbyte]
+#endif
 
 
 	' Lets do a little verify that the packet looks somewhat valid.
-	if (_wAPIPacketLen > APIPACKETMAXSIZE) then
+	if (_wAPIPacketLen > APIPACKETMAXSIZE) or (_wAPIPacketLen = 0) then
 		; bugbug:: should we flush the input or hope things simply realign?
 		; Or should we go back to look for 7e...  Think I will try that...
-		hserout 1, ["API Packet size error", 13]
+		hserout 1, ["API Packet size error: ", Dec _wAPIPacketLen,  13]
 		goto _ARP_Look_For_Packet_Start  ; again hate gotos, but...
 	endif
 
 	' Then read in the packet including the checksum.
-	hserin HSP_XBEE, _ARP_TO, 20000,  [str _bAPIPacket\_wAPIPacketLen, _bChkSumIn]
+	hserin HSP_XBEE, _ARP_TO, 30000,  [str _bAPIPacket\_wAPIPacketLen, _bChkSumIn]
 	
 
 	' Now lets verify the checksum.
@@ -1090,7 +1113,8 @@ _ARP_Look_For_Packet_Start:
 	return _wAPIPacketLen 	' return the packet length as the caller may need to know this...
 	
 _ARP_TO:
-	hserout 1, ["XBeeRecvPacket  Tmeout", 13]
+	gosub GetCurrentTime
+	hserout 1, ["XBeeRecvPacket Timeout(", dec _wAPIPacketLen, ",", dec cbXBeeAvail, ",", dec lCurrentTime, ")",13]
 	return 0  ; we had a timeout
 
 ;==============================================================================
